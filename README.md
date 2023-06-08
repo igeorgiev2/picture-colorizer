@@ -73,7 +73,9 @@ The "Preview" button opens a new tab in the web browser, opening the current ima
 To close the review tab, in order to free up memory, it is advisable to use the "CLOSE" button below the image.
 ![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes_demo.png)
 *Contrast increased and blur effect added*
+
 ![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/car_demo.png)
+*Mixed colors and patterns*
 
 =============
 
