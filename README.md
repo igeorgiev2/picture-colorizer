@@ -71,7 +71,7 @@ By pressing the corresponding button, you select the tool. A small window appear
 Changes are made in real time, on the selected image. In the window of each tool there is a "reset" button, the purpose of which is to return the original state of the image. But this state is for changes made by the currently selected tool.
 The "Preview" button opens a new tab in the web browser, opening the current image in full size. Note that this may result in using a large amount of system memory!
 To close the review tab, in order to free up memory, it is advisable to use the "CLOSE" button below the image.
-![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes_demo.png)
+![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes_demo.png)<br>
 *Contrast increased and blur effect added*
 
 ![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/car_demo.png)
