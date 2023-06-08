@@ -1,0 +1,995 @@
+<!doctype html>
+<html lang="en" class="h-100">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description"
+    content="Picture colorizer. Change the colors of any picture or image right in your web browser.">
+  <meta name="generator" content="Bootstrap">
+  <title>Picture Colorizer</title>
+
+  <link href="./css/bootstrap.min.css" rel="stylesheet">
+
+  <script src="./js/sweetalert.js"></script>
+
+  <script>
+    function validateImageURL(url) {
+      return new Promise((resolve, reject) => {
+        let image = new Image();
+        image.onload = () => resolve(url);
+        image.onerror = () => reject('Invalid image URL');
+        image.src = url;
+        pictureURL = url;
+      });
+    }
+
+    function setPictureNameLabel(url) {
+      let picture_url = document.getElementById("my-picture-address");
+      if (url == undefined) {
+        picture_url.innerHTML = document.getElementById("my-picture").getAttribute("src").split('/').pop() + "&emsp;";
+      } else {
+        picture_url.innerHTML = url.split('/').pop() + "&emsp;";
+      }
+    }
+
+    function sanitizeFileName(url) {
+      const fileNameParts = url.split('?');
+      return fileNameParts[0];
+    }
+
+    function getFileExtension(url) {
+      return sanitizeFileName(url).split('.').pop();
+    }
+
+    function convertCanvasToBase64(canvas) {
+      return canvas.toDataURL();
+    }
+
+    function previewPicture() {
+      let myWindow = window.open("", "_blank");
+      myWindow.document.write("<img src='" + convertCanvasToBase64(myCanvas) + "'><br><br>");
+      myWindow.document.write("<button onclick=\"document.getElementsByTagName('IMG')[0].remove(); window.close();\">CLOSE</button>");
+      myWindow.document.write("<script>const body=document.getElementsByTagName('BODY')[0]; body.style.textAlign='center';<\/script>");
+
+    }
+
+    function shutdownMagnifier() {
+      if (document.querySelector(".img-magnifier-glass") != null) {
+        document.querySelector(".img-magnifier-glass").remove();
+        document.getElementById("button-magnify").classList.toggle("active");
+      }
+    }
+
+    function downloadPicture(url, name) {
+      if ((url && name) == undefined) {
+        let canvas = myCanvas;
+        let image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+        let link = document.createElement("a");
+        link.download = "picture.png";
+        link.href = image;
+        link.click();
+      } else {
+        fetch(url)
+          .then(resp => resp.blob())
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+          })
+          .catch(() => Swal.fire({
+            icon: 'error',
+            title: 'Something went wrong!',
+            text: 'Most likely, the website you are trying to download the image from has disabled automatic downloads. Try downloading the image manually by right-clicking on the image and selecting "Save image as...".'
+          }));
+      }
+    }
+
+    function insertImage() {
+      Swal.fire({
+        title: 'Enter your picture URL',
+        input: 'url',
+        inputAttributes: {
+          autocapitalize: 'off'
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Show image',
+        preConfirm: (url) => {
+          return validateImageURL(url)
+            .then((url) => {
+              return { url };
+            })
+            .catch((error) => {
+              Swal.showValidationMessage(error);
+            });
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          let pictureName = sanitizeFileName(result.value.url).split('/').pop();
+          Swal.fire({
+            showCloseButton: true,
+            showConfirmButton: false,
+            imageUrl: result.value.url,
+            imageAlt: 'Image',
+            html: '<p>Your selected picture is ready to color. Click to download the picture. Then upload it to the picture colorizer.</p><button type="button" class="swal2-confirm swal2-styled" aria-label style="display: inline" onclick="downloadPicture(' + `'${result.value.url}','${pictureName}'` + ')">DOWNLOAD</button>',
+          }).then(function () {
+            /* myPicture.onload = () => {
+               uploadimage(result.value.url);
+               globalWidth = myPicture.width = myCanvas.width = myPicture.naturalWidth;
+               globalHeight = myPicture.height = myCanvas.height = myPicture.naturalHeight;
+               imageRatio = globalHeight / globalWidth;
+               ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+             } */
+          });
+        }
+      }).catch((error) => {
+        console.error(error)
+      });
+    }
+
+    function uploadImage(url) {
+      const input = document.getElementById('upload');
+      let file;
+      input.onchange = () => {
+        if (url == undefined) file = input.files[0]
+        else file = url;
+        const reader = new FileReader();
+        if (file != undefined) {
+          reader.readAsDataURL(file);
+          setPictureNameLabel(file.name);
+          reader.onload = () => {
+            localStorage.setItem('my-image', reader.result);
+            myPicture.removeAttribute('width');
+            myPicture.removeAttribute('height');
+            myPicture.src = localStorage.getItem('my-image');
+            myPicture.onload = () => {
+              globalWidth = myPicture.width = myCanvas.width = myPicture.naturalWidth;
+              globalHeight = myPicture.height = myCanvas.height = myPicture.naturalHeight;
+              imageRatio = globalHeight / globalWidth;
+              ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+            }
+          }
+        }
+      }
+    }
+
+    function showTool(toolTitle, toolCode, toolPlace) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      Swal.fire({
+        title: toolTitle,
+        html: toolCode,
+        position: toolPlace,
+        background: 'RGBA(33,37,41,1)',
+        color: 'RGBA(255,255,255,1)',
+        width: '320px',
+        showCloseButton: true,
+        allowOutsideClick: false,
+        showConfirmButton: false
+      });
+      document.getElementById("swal2-html-container").style.margin = "1em .3em .3em";
+
+      // Shutdown magnifier (if is enabled) before start any tool. Add the chosen tool background logic.
+      if (toolTitle == "Size") {
+        shutdownMagnifier();
+        pictureSize(globalWidth, globalHeight, globalImageMarginTop);
+      }
+      if (toolTitle == "Color") {
+        shutdownMagnifier();
+        pictureColor(globalRed, globalGreen, globalBlue, globalAlpha);
+      }
+      if (toolTitle == "Pattern") {
+        shutdownMagnifier();
+        picturePattern(globalRedCheckbox, globalGreenCheckbox, globalBlueCheckbox);
+      }
+      if (toolTitle == "Effect") {
+        shutdownMagnifier();
+        pictureEffect(globalBlur, globalBrightness, globalContrast, globalGrayscale, globalHueRotate, globalInvert, globalOpacity, globalSaturate, globalSepia);
+      }
+    }
+
+    function pictureSize(width, height, margin) {
+      if (document.getElementById("automatic-checkbox") != undefined) {
+        automaticCheckbox = document.getElementById("automatic-checkbox");
+        automaticCheckbox.checked = globalAutomaticCheckbox;
+        automaticCheckbox.addEventListener('change', function () {
+          if (this.checked) {
+            globalAutomaticCheckbox = true;
+          } else {
+            globalAutomaticCheckbox = false;
+          }
+        });
+      }
+
+      let widthSliderLabel = document.getElementById("width-slider-label"),
+        widthSlider = document.getElementById("width-slider"),
+        heightSliderLabel = document.getElementById("height-slider-label"),
+        heightSlider = document.getElementById("height-slider"),
+        marginSliderLabel = document.getElementById("margin-top-slider-label"),
+        marginSlider = document.getElementById("margin-top-slider");
+
+      widthSlider.max = myPicture.naturalWidth;
+      heightSlider.max = myPicture.naturalHeight;
+
+      if ((width && height) != undefined) {
+        widthSliderLabel.innerHTML = "Width " + globalWidth + "px";
+        widthSlider.value = globalWidth;
+        heightSliderLabel.innerHTML = "Height " + globalHeight + "px";
+        heightSlider.value = globalHeight;
+        marginSliderLabel.innerHTML = "Margin " + globalImageMarginTop + "px";
+        marginSlider.value = globalImageMarginTop;
+      } else {
+
+        // If width and height arguments are ommited execute reset size.
+        automaticCheckbox.checked = globalAutomaticCheckbox = true;
+        myPicture.classList.add("img-fluid");
+        widthSliderLabel.innerHTML = "Width " + myPicture.naturalWidth + "px";
+        globalWidth = widthSlider.value = myPicture.width = myCanvas.width = myPicture.naturalWidth;
+        heightSliderLabel.innerHTML = "Height " + myPicture.naturalHeight + "px";
+        globalHeight = heightSlider.value = myPicture.height = myCanvas.height = myPicture.naturalHeight;
+        marginSliderLabel.innerHTML = "Margin " + 0 + "px";
+        marginSlider.value = globalImageMarginTop = 0;
+        myPictureContainer.style.marginTop = "0px";
+        ctx.drawImage(img, 0, 0);
+      }
+
+      widthSlider.addEventListener("input", function () {
+        if (automaticCheckbox.checked) {
+          width_value = parseFloat(this.value);
+          widthSliderLabel.innerHTML = "Width " + width_value + "px";
+          globalWidth = width_value;
+          globalHeight = Math.round(imageRatio * width_value);
+          heightSliderLabel.innerHTML = "Height " + globalHeight + "px";
+          heightSlider.value = globalHeight;
+
+          myPicture.width = globalWidth;
+          myPicture.height = globalHeight;
+          myCanvas.width = globalWidth;
+          myCanvas.height = globalHeight;
+          ctx.drawImage(img, 0, 0, width_value, globalHeight);
+        }
+        if (!automaticCheckbox.checked) {
+          width_value = parseFloat(this.value);
+          widthSliderLabel.innerHTML = "Width " + width_value + "px";
+          globalWidth = myPicture.width = myCanvas.width = width_value;
+          myPicture.width = globalWidth;
+          ctx.drawImage(img, 0, 0, width_value, globalHeight);
+        }
+      });
+
+      heightSlider.addEventListener("input", function () {
+        if (!automaticCheckbox.checked) {
+          height_value = parseFloat(this.value);
+          heightSliderLabel.innerHTML = "Height " + height_value + "px";
+          globalHeight = myPicture.height = myCanvas.height = height_value;
+          ctx.drawImage(img, 0, 0, globalWidth, height_value);
+        }
+      });
+
+      marginSlider.addEventListener("input", function () {
+        margin_value = parseFloat(this.value);
+        marginSliderLabel.innerHTML = "Margin " + margin_value + "px";
+        myPictureContainer.style.marginTop = margin_value + "px";
+        globalImageMarginTop = margin_value;
+      });
+    }
+
+    function colors(color) {
+      const imageData = ctx.getImageData(0, 0, globalWidth, globalHeight);
+      const data = imageData.data;
+      let i, length = data.length;
+      for (i = 0; i < length; i += 4) {
+        switch (color) {
+          case 'Red':
+            data[i] = globalRed;
+            break;
+          case 'Green':
+            data[i + 1] = globalGreen;
+            break;
+          case 'Blue':
+            data[i + 2] = globalBlue;
+            break;
+          case 'Alpha':
+            data[i + 3] = globalAlpha;
+            break;
+          default:
+        }
+      }
+
+      // If the color argument is ommited execute reset colors.
+      if (color == undefined) return ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function pictureColor(red, green, blue, alpha) {
+      let redSliderLabel = document.getElementById("red-slider-label"),
+        redSlider = document.getElementById("red-slider"),
+        greenSliderLabel = document.getElementById("green-slider-label"),
+        greenSlider = document.getElementById("green-slider"),
+        blueSliderLabel = document.getElementById("blue-slider-label"),
+        blueSlider = document.getElementById("blue-slider"),
+        alphaSliderLabel = document.getElementById("alpha-slider-label"),
+        alphaSlider = document.getElementById("alpha-slider");
+
+      redSlider.value = red;
+      greenSlider.value = green;
+      blueSlider.value = blue;
+      alphaSlider.value = alpha;
+
+      if ((red && green && blue && alpha) != undefined) {
+        redSliderLabel.innerHTML = "Red " + red;
+        greenSliderLabel.innerHTML = "Green " + green;
+        blueSliderLabel.innerHTML = "Blue " + blue;
+        alphaSliderLabel.innerHTML = "Alpha " + alpha;
+
+        // Add event listeners to the color sliders.
+        redSlider.addEventListener("input", function () {
+          globalRed = parseFloat(this.value);
+          redSliderLabel.innerHTML = "Red " + globalRed;
+          colors("Red");
+        });
+        greenSlider.addEventListener("input", function () {
+          globalGreen = parseFloat(this.value);
+          greenSliderLabel.innerHTML = "Green " + globalGreen;
+          colors("Green");
+        });
+        blueSlider.addEventListener("input", function () {
+          globalBlue = parseFloat(this.value);
+          blueSliderLabel.innerHTML = "Blue " + globalBlue;
+          colors("Blue");
+        });
+        alphaSlider.addEventListener("input", function () {
+          globalAlpha = parseFloat(this.value);
+          alphaSliderLabel.innerHTML = "Alpha " + globalAlpha;
+          colors("Alpha");
+        });
+      } else {
+
+        // If width red, green, blue and alpha arguments are ommited execute reset sliders and colors.
+        redSliderLabel.innerHTML = "Red 0";
+        greenSliderLabel.innerHTML = "Green 0";
+        blueSliderLabel.innerHTML = "Blue 0";
+        alphaSliderLabel.innerHTML = "Alpha 0";
+        redSlider.value = greenSlider.value = blueSlider.value = alphaSlider.value = 0;
+        colors();
+      }
+    }
+
+    function applyPattern() {
+
+      // Generate the initial canvas.
+      patterns();
+
+      // Set the chosen colors.
+      takeTool('Pattern', 'top-start');
+    }
+
+    function patterns(booleanRed, booleanGreen, booleanBlue) {
+      const imageData = ctx.getImageData(0, 0, globalWidth, globalHeight);
+      const data = imageData.data;
+      let i, length = data.length;
+
+      if ((booleanRed || booleanGreen || booleanBlue) != undefined) {
+
+        // All colors are removed. Draw black and white image.
+        if (booleanRed == false) if (booleanGreen == false) if (booleanBlue == false) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i] = data[i + 1] = data[i + 2] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Red color is removed.
+        if (booleanRed == false) if (booleanGreen == true) if (booleanBlue == true) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i] = data[i + 1] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Green color is removed.
+        if (booleanRed == true) if (booleanGreen == false) if (booleanBlue == true) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i + 1] = data[i + 2] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Blue color is removed.
+        if (booleanRed == true) if (booleanGreen == true) if (booleanBlue == false) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i] = data[i + 2] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Red and green colors are removed.
+        if (booleanRed == false) if (booleanGreen == false) if (booleanBlue == true) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i + 1] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Red and blue colors are removed.
+        if (booleanRed == false) if (booleanGreen == true) if (booleanBlue == false) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Green and blue colors are removed.
+        if (booleanRed == true) if (booleanGreen == false) if (booleanBlue == false) {
+          for (i = 0; i < length; i += 4) {
+            grey = data[i] * 0.3 + data[i + 1] * 0.59 + data[i + 2] * 0.11;
+            data[i + 2] = grey;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // All colors are present. Draw full color image.
+        if (booleanRed == true) if (booleanGreen == true) if (booleanBlue == true) {
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // If the arguments are ommited execute reset colors.
+      } else return ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+    }
+
+    function picturePattern(red, green, blue) {
+      if ((red && green && blue) != undefined) {
+        redCheckbox = document.getElementById("red-checkbox"),
+          greenCheckbox = document.getElementById("green-checkbox"),
+          blueCheckbox = document.getElementById("blue-checkbox");
+
+        redCheckbox.checked = globalRedCheckbox;
+        redCheckbox.addEventListener('change', function () {
+          if (this.checked) {
+            globalRedCheckbox = true;
+          } else {
+            globalRedCheckbox = false;
+          }
+        });
+
+        greenCheckbox.checked = globalGreenCheckbox;
+        greenCheckbox.addEventListener('change', function () {
+          if (this.checked) {
+            globalGreenCheckbox = true;
+          } else {
+            globalGreenCheckbox = false;
+          }
+        });
+
+        blueCheckbox.checked = globalBlueCheckbox;
+        blueCheckbox.addEventListener('change', function () {
+          if (this.checked) {
+            globalBlueCheckbox = true;
+          } else {
+            globalBlueCheckbox = false;
+          }
+        });
+
+        patterns(red, green, blue);
+      } else {
+        globalRedCheckbox = globalGreenCheckbox = globalBlueCheckbox = redCheckbox.checked = greenCheckbox.checked = blueCheckbox.checked = false;
+        patterns();
+      }
+    }
+
+    function allFilters() {
+      ctx.filter = "blur(" + (0.1 * globalBlur).toFixed(2) + "px) "
+        + "brightness(" + globalBrightness + "%) "
+        + "contrast(" + globalContrast + "%) "
+        + "grayscale(" + globalGrayscale + "%) "
+        + "hue-rotate(" + globalHueRotate + "deg) "
+        + "invert(" + globalInvert + "%) "
+        + "saturate(" + globalSaturate + "%) "
+        + "sepia(" + globalSepia + "%)";
+    }
+
+    function pictureEffect(blur, brightness, contrast, grayscale, hueRotate, invert, opacity, saturate, sepia) {
+      let blurSliderLabel = document.getElementById("blur-slider-label"),
+        blurSlider = document.getElementById("blur-slider"),
+        brightnessSliderLabel = document.getElementById("brightness-slider-label"),
+        brightnessSlider = document.getElementById("brightness-slider"),
+        contrastSliderLabel = document.getElementById("contrast-slider-label"),
+        contrastSlider = document.getElementById("contrast-slider"),
+        grayscaleSliderLabel = document.getElementById("grayscale-slider-label"),
+        grayscaleSlider = document.getElementById("grayscale-slider"),
+        hueRotateSliderLabel = document.getElementById("hue-rotate-slider-label"),
+        hueRotateSlider = document.getElementById("hue-rotate-slider"),
+        invertSliderLabel = document.getElementById("invert-slider-label"),
+        invertSlider = document.getElementById("invert-slider"),
+        opacitySliderLabel = document.getElementById("opacity-slider-label"),
+        opacitySlider = document.getElementById("opacity-slider"),
+        saturateSliderLabel = document.getElementById("saturate-slider-label"),
+        saturateSlider = document.getElementById("saturate-slider"),
+        sepiaSliderLabel = document.getElementById("sepia-slider-label"),
+        sepiaSlider = document.getElementById("sepia-slider");
+
+      blurSlider.value = blur;
+      brightnessSlider.value = brightness;
+      contrastSlider.value = contrast;
+      grayscaleSlider.value = grayscale;
+      hueRotateSlider.value = hueRotate;
+      invertSlider.value = invert;
+      opacitySlider.value = opacity;
+      saturateSlider.value = saturate;
+      sepiaSlider.value = sepia;
+
+      if ((blur && brightness && contrast && grayscale && hueRotate && invert && opacity && saturate && sepia) != undefined) {
+        if (document.getElementById("combine-checkbox") != undefined) {
+          combineCheckbox = document.getElementById("combine-checkbox");
+          combineCheckbox.checked = globalCombineCheckbox;
+          combineCheckbox.addEventListener('change', function () {
+            if (this.checked) {
+              globalCombineCheckbox = true;
+            } else {
+              globalCombineCheckbox = false;
+            }
+          });
+        }
+
+        blurSliderLabel.innerHTML = "Blur " + blur + "px";
+        brightnessSliderLabel.innerHTML = "Brightness " + brightness + "%";
+        contrastSliderLabel.innerHTML = "Contrast " + contrast + "%";
+        grayscaleSliderLabel.innerHTML = "Grayscale " + grayscale + "%";
+        hueRotateSliderLabel.innerHTML = "Hue rotate " + hueRotate + "deg";
+        invertSliderLabel.innerHTML = "Invert " + invert + "%";
+        opacitySliderLabel.innerHTML = "Opacity " + opacity + "%";
+        saturateSliderLabel.innerHTML = "Saturate " + saturate + "%";
+        sepiaSliderLabel.innerHTML = "Sepia " + sepia + "%";
+
+        // Add event listeners to the effect sliders.
+        blurSlider.addEventListener("input", function () {
+          globalBlur = parseFloat(this.value);
+          blurSliderLabel.innerHTML = "Blur " + (0.1 * globalBlur).toFixed(2) + "px";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "blur(" + (0.1 * globalBlur).toFixed(2) + "px)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        brightnessSlider.addEventListener("input", function () {
+          globalBrightness = parseFloat(this.value);
+          brightnessSliderLabel.innerHTML = "Brightness " + globalBrightness + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "brightness(" + globalBrightness + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        contrastSlider.addEventListener("input", function () {
+          globalContrast = parseFloat(this.value);
+          contrastSliderLabel.innerHTML = "Contrast " + globalContrast + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "contrast(" + globalContrast + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        grayscaleSlider.addEventListener("input", function () {
+          globalGrayscale = parseFloat(this.value);
+          grayscaleSliderLabel.innerHTML = "Grayscale " + globalGrayscale + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "grayscale(" + globalGrayscale + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        hueRotateSlider.addEventListener("input", function () {
+          globalHueRotate = parseFloat(this.value);
+          hueRotateSliderLabel.innerHTML = "Hue rotate " + globalHueRotate + "deg";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "hue-rotate(" + globalHueRotate + "deg)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        invertSlider.addEventListener("input", function () {
+          globalInvert = parseFloat(this.value);
+          invertSliderLabel.innerHTML = "Invert " + globalInvert + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "invert(" + globalInvert + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        opacitySlider.addEventListener("input", function () {
+          globalOpacity = parseFloat(this.value);
+          opacitySliderLabel.innerHTML = "Opacity " + globalOpacity + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "opacity(" + globalOpacity + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        saturateSlider.addEventListener("input", function () {
+          globalSaturate = parseFloat(this.value);
+          saturateSliderLabel.innerHTML = "Saturate " + globalSaturate + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "saturate(" + globalSaturate + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+
+        sepiaSlider.addEventListener("input", function () {
+          globalSepia = parseFloat(this.value);
+          sepiaSliderLabel.innerHTML = "Sepia " + globalSepia + "%";
+          if (globalCombineCheckbox) {
+            allFilters();
+          } else {
+            ctx.filter = "sepia(" + globalSepia + "%)";
+          }
+          ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+        });
+      } else {
+
+        // If the arguments are ommited execute reset sliders and effects.
+        blurSliderLabel.innerHTML = "Blur 0px";
+        brightnessSliderLabel.innerHTML = "Brightness 100%";
+        contrastSliderLabel.innerHTML = "Contrast 100%";
+        grayscaleSliderLabel.innerHTML = "Grayscale 0%";
+        hueRotateSliderLabel.innerHTML = "Hue rotate 0deg";
+        invertSliderLabel.innerHTML = "Invert 0%";
+        opacitySliderLabel.innerHTML = "Opacity 0%";
+        saturateSliderLabel.innerHTML = "Saturate 100%";
+        sepiaSliderLabel.innerHTML = "Sepia 0%";
+        combineCheckbox.checked = globalCombineCheckbox = true;
+        brightnessSlider.value = contrastSlider.value = saturateSlider.value = 100;
+        globalBrightness = globalContrast = globalSaturate = 100;
+        blurSlider.value = grayscaleSlider.value = hueRotateSlider.value = invertSlider.value = opacitySlider.value = sepiaSlider.value = 0;
+        globalBlur = globalGrayscale = globalHueRotate = globalInvert = globalOpacity = globalSepia = 0;
+
+        // Adding any filter alone to the canvas will reset it. 
+        ctx.filter = "sepia(" + globalSepia + "%)";
+        ctx.drawImage(img, 0, 0, globalWidth, globalHeight);
+      }
+    }
+
+    function magnifyPicture(imgObject, canvasObject, zoom, buttonID) {
+
+      let glass, w, h, bw;
+
+      if (document.querySelector(".img-magnifier-glass") == null) {
+
+        if (imgObject.naturalWidth > document.getElementById("my-picture-container").offsetWidth) {
+          Swal.fire({
+            text: "The size of your photo is larger than the containing container. There will be a discrepancy between the location of the magnifier and the actual location on the photo. It is better to preview the photo in actual size. Would you like to use the magnifying glass?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Use magnifier!'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              Swal.fire(
+                '',
+                'Right-click to turn off the magnifying glass!',
+                'success'
+              )
+            } else if (
+              result.dismiss === Swal.DismissReason.cancel
+            ) {
+              document.querySelector(".img-magnifier-glass").remove();
+              document.getElementById(buttonID).classList.toggle('active');
+            }
+          })
+        }
+
+        /*create magnifier glass:*/
+        glass = document.createElement("DIV");
+        glass.setAttribute("class", "img-magnifier-glass");
+
+        /*insert magnifier glass:*/
+        canvasObject.parentElement.insertBefore(glass, canvasObject);
+
+        /*set background properties for the magnifier glass:*/
+        glass.style.backgroundImage = "url('" + convertCanvasToBase64(canvasObject) + "')";
+        glass.style.backgroundRepeat = "no-repeat";
+        glass.style.backgroundSize = (canvasObject.width * zoom) + "px " + (canvasObject.height * zoom) + "px";
+        bw = 3;
+        w = glass.offsetWidth / 2;
+        h = glass.offsetHeight / 2;
+
+        /* Add right click listener on the glass to disable it. */
+        glass.oncontextmenu = function () {
+          document.querySelector(".img-magnifier-glass").remove();
+          document.getElementById(buttonID).classList.toggle('active');
+        }
+
+        /*execute a function when someone moves the magnifier glass over the image:*/
+        glass.addEventListener("mousemove", moveMagnifier);
+        canvasObject.addEventListener("mousemove", moveMagnifier);
+
+        /*and also for touch screens:*/
+        glass.addEventListener("touchmove", moveMagnifier);
+        canvasObject.addEventListener("touchmove", moveMagnifier);
+
+        function moveMagnifier(e) {
+          let pos, x, y;
+
+          /*prevent any other actions that may occur when moving over the image*/
+          e.preventDefault();
+
+          /*get the cursor's x and y positions:*/
+          pos = getCursorPos(e);
+          x = pos.x;
+          y = pos.y;
+
+          /*prevent the magnifier glass from being positioned outside the image:*/
+          if (x > canvasObject.width - (w / zoom)) { x = canvasObject.width - (w / zoom); }
+          if (x < w / zoom) { x = w / zoom; }
+          if (y > canvasObject.height - (h / zoom)) { y = canvasObject.height - (h / zoom); }
+          if (y < h / zoom) { y = h / zoom; }
+
+          /*set the position of the magnifier glass:*/
+          glass.style.left = (e.pageX - (document.getElementById("my-picture-container").offsetWidth / 5.28)) + 6 + "px";
+          glass.style.top = (y - h) + "px";
+
+          /*display what the magnifier glass "sees":*/
+          glass.style.backgroundPosition = "-" + ((x * zoom) - w + bw) + "px -" + ((y * zoom) - h + bw) + "px";
+        }
+        function getCursorPos(e) {
+          let a, x = 0, y = 0;
+          e = e || window.event;
+
+          /*get the x and y positions of the image:*/
+          a = canvasObject.getBoundingClientRect();
+
+          /*calculate the cursor's x and y coordinates, relative to the image:*/
+          x = e.pageX - a.left;
+          y = e.pageY - a.top;
+
+          /*consider any page scrolling:*/
+          x = x - window.pageXOffset;
+          y = y - window.pageYOffset;
+          return { x: x, y: y };
+        }
+      } else document.querySelector(".img-magnifier-glass").remove();
+
+      document.getElementById(buttonID).classList.toggle('active');
+    }
+
+    function comparePicture(shutdown, imgObject, canvasObject, buttonID) {
+      if (shutdown == false) {
+        imgObject.classList.toggle('hide-element');
+        //imgObject.classList.toggle('img-fluid');
+        canvasObject.classList.toggle('border');
+        canvasObject.classList.toggle('border-primary');
+        document.getElementById(buttonID).classList.toggle('active');
+      } else {
+        imgObject.classList.add('hide-element');
+        canvasObject.classList.add('border');
+        canvasObject.classList.add('border-primary');
+        document.getElementById(buttonID).classList.remove('active');
+      }
+    }
+
+    function changeMyPicture(newURL) {
+      myPicture.src = newURL;
+      setTimeout(() => {
+        myPicture.onload = globalWidth = myPicture.naturalWidth,
+          globalHeight = myPicture.naturalHeight,
+          imageRatio = globalHeight / globalWidth,
+          myPicture.width = globalWidth,
+          myPicture.height = globalHeight,
+          myCanvas.width = globalWidth,
+          myCanvas.height = globalHeight,
+          ctx.imageSmoothingEnabled = true,
+          ctx.imageSmoothingQuality = "high",
+          ctx.drawImage(img, 0, 0),
+          setPictureNameLabel();
+      }, 1000);
+    }
+
+  </script>
+
+  <!-- Custom styles for this template -->
+  <link href="./css/cover.css" rel="stylesheet">
+</head>
+
+<body class="d-flex text-center text-bg-dark">
+  <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+    <header class="mb-auto pb-4">
+      <div>
+        <h3 class="float-md-start mb-0">Picture Colorizer</h3>
+        <nav class="nav nav-masthead justify-content-center float-md-end">
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes.png')"
+            class="nav-link fw-bold py-1 px-0" href="#">Athletes</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/car.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Car</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/colors.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Colors</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/mario.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Mario</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/model.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Model</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/monkey.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Monkey</a>
+          <a onclick="changeMyPicture('https:\/\/raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/roses.png'); myCanvas.classList.add('border'); myCanvas.classList.add('border-primary');"
+            class="nav-link fw-bold py-1 px-0" href="#">Roses</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="px-3">
+      <h2 class="lead">Picture colorizer is a one-page editor for resizing and colorizing your pictures. Simple and easy
+        to use.</h2>
+      <div class="row py-3">
+        <div id="my-picture-container" class="col-lg-12 text-center img-magnifier-container">
+          <img id="my-picture" src="https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes.png"
+            class="img-fluid hide-element" alt="my-picture" crossorigin="anonymous">
+          <canvas id="my-picture-canvas" class="img-fluid border border-primary"></canvas>
+        </div>
+        <div id="my-picture-address-buttons-container" class="col-lg-12 py-2 text-center">
+          <span class="py-1">
+            <b><span id="my-picture-address"></span></b>
+          </span>
+          <button id="insert" type="button" class="btn btn-primary btn-sm normalize-1px"
+            onClick="insertImage()">Insert</button>
+          <label id="upload-label" for="upload" style="display: none">Choose an image to upload...</label>
+          <input id="upload" type="file" accept="image/*" style="display: none">
+          <button id="upload-button" type="button" class="btn btn-primary btn-sm normalize-1px"
+            onclick="shutdownMagnifier(); comparePicture(true, myPicture, myCanvas, 'button-compare'); document.getElementById('upload-label').click(); uploadImage();">Upload</button>
+        </div>
+      </div>
+      <div class="row py-3"
+        style="margin-right: calc(-1.8 * var(--bs-gutter-x));margin-left: calc(-1.8 * var(--bs-gutter-x));">
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-size" type="button" class="btn btn-primary"
+              onClick="takeTool('Size', 'top-start')">Size</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-color" type="button" class="btn btn-primary"
+              onClick="takeTool('Color', 'top-start')">Color</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-pattern" type="button" class="btn btn-primary"
+              onClick="takeTool('Pattern', 'top-start')">Pattern</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-effect" type="button" class="btn btn-primary"
+              onClick="takeTool('Effect', 'top-start')">Effect</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-magnify" type="button" class="btn btn-primary"
+              onClick="magnifyPicture(myPicture, myCanvas, 3, 'button-magnify')">Magnify</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-compare" type="button" class="btn btn-primary"
+              onClick="comparePicture(false, myPicture, myCanvas, 'button-compare')">Compare</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-preview" type="button" class="btn btn-primary"
+              onClick="previewPicture()">Preview</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-download" type="button" class="btn btn-primary"
+              onClick="downloadPicture()">Download</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-convert" type="button" class="btn btn-primary"
+              onClick="takeTool('Convert', 'top-start')">Convert</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-restart" type="button" class="btn btn-primary"
+              onClick="location.reload(true)">Restart</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-facebook" type="button" class="btn btn-primary"
+              onClick="location.href='https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fgithub.com%2Figeorgiev2%2Fpicture-colorizer&amp;src=sdkpreparse'">Facebook</button></div>
+        </div>
+        <div class="button-auto-width">
+          <div class="py-2"><button id="button-twitter" type="button" class="btn btn-primary"
+              onClick="location.href='https://twitter.com/intent/tweet?text=https://github.com/igeorgiev2/picture-colorizer'">Twitter</button></div>
+        </div>
+      </div>
+      <p>Use a web browser to change the size and color of each image. No server, no registration, no artificial
+        intelligence.</p>
+      <p>Your computer, pure math, pure logic and craftsmanship.</p>
+    </main>
+
+    <footer class="mt-auto text-white-50">
+      <p>Send <a href="mailto:igeorgiev.uk@gmail.com?subject=Picture_Colorizer_Feedback&body=Message"
+          class="text-white">feedback</a> or ask a <a
+          href="mailto:igeorgiev.uk@gmail.com?subject=Picture_Colorizer_Question&body=Message"
+          class="text-white">question</a>.</p>
+    </footer>
+  </div>
+
+  <script>
+    let myPictureContainer = document.getElementById("my-picture-container"),
+      myPicture = document.getElementById("my-picture"),
+      pictureURL, globalWidth, globalHeight, imageRatio,
+      globalAutomaticCheckbox = globalCombineCheckbox = true,
+      globalImageMarginTop = 0,
+      myCanvas = document.getElementById("my-picture-canvas"),
+      ctx = myCanvas.getContext("2d", { willReadFrequently: true }),
+      img = myPicture,
+      globalRed = globalGreen = globalBlue = globalAlpha = 0,
+      globalBrightness = globalContrast = globalSaturate = 100,
+      globalBlur = globalGrayscale = globalHueRotate = globalInvert = globalOpacity = globalSepia = 0,
+      globalRedCheckbox = globalGreenCheckbox = globalBlueCheckbox = false;
+
+    window.onload = setTimeout(() => {
+      globalWidth = myPicture.naturalWidth,
+        globalHeight = myPicture.naturalHeight,
+        imageRatio = globalHeight / globalWidth,
+        myPicture.width = globalWidth,
+        myPicture.height = globalHeight,
+        myCanvas.width = globalWidth,
+        myCanvas.height = globalHeight,
+        ctx.imageSmoothingEnabled = true,
+        ctx.imageSmoothingQuality = "high",
+        ctx.drawImage(img, 0, 0),
+        setPictureNameLabel();
+    }, 1000);
+
+    // When start, remove the border for athletes picture.
+    myCanvas.classList.remove('border');
+    myCanvas.classList.remove('border-primary');
+
+    window.addEventListener('beforeunload', function (e) {
+      pictureSize();
+      pictureColor();
+      picturePattern();
+      picturePattern();
+      pictureEffect();
+      myCanvas.remove();
+      ctx.remove();
+      img.remove();
+    });
+
+    function takeTool(tool, position) {
+      let toolButtons = '<button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="takeTool(\'Size\', \'top-start\')">Size</button><span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="takeTool(\'Color\', \'top-start\')">Color</button><span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="takeTool(\'Pattern\', \'top-start\')">Pattern</button><span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="takeTool(\'Effect\', \'top-start\')">Effect</button>';
+      if (tool == 'Size') {
+        code = '<div class="col-lg-12"><label class="py-1"><span>Automatic </span><input id="automatic-checkbox" style="padding: 0px" type="checkbox" checked></label><div><span id="width-slider-label">Width </span><label class="label-100"><input id="width-slider" step="1" min="1" type="range" class="slider-90"></label></div><div><span id="height-slider-label">Height </span><label class="label-100"><input id="height-slider" step="1" min="1" type="range" class="slider-90"></label></div><div><span id="margin-top-slider-label">Margin </span><label class="label-100"><input id="margin-top-slider" value="0" step="1" min="0" max="250" type="range" class="slider-90"></label></div><div id="tool-buttons-block" class="py-2">' + toolButtons + '<span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="pictureSize()">Reset</button></div></div>';
+        showTool(tool, code, position);
+      }
+      if (tool == 'Color') {
+        code = '<div class="col-lg-12"><span id="red-slider-label">Red </span><label id="red-label" for="red-slider" class="label-100"><input id="red-slider" type="range" min="0" max="255" value="0" class="slider-90"></label><span id="green-slider-label">Green </span><label id="green-label" for="green-slider" class="label-100"><input id="green-slider" type="range" min="0" max="255" value="0" class="slider-90"></label><span id="blue-slider-label">Blue </span><label id="blue-label" for="blue-slider" class="label-100"><input id="blue-slider" type="range" min="0" max="255" value="0" class="slider-90"></label><span id="alpha-slider-label">Alpha </span><label id="alpha-label" for="red-slider" class="label-100"><input id="alpha-slider" type="range" min="0" max="255" value="1" class="slider-90"></label><div id="tool-buttons-block" class="py-2">' + toolButtons + '<span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="pictureColor()">Reset</button></div></div>';
+        showTool(tool, code, position);
+      }
+      if (tool == 'Pattern') {
+        code = '<div class="col-lg-12"><div class="py-2"><label for="red-checkbox" class="py-1"><span>Red </span><input id="red-checkbox" style="padding: 0px" type="checkbox"></label><span class="px-1"></span><label for="green-checkbox" class="py-1"><span>Green </span><input id="green-checkbox" style="padding: 0px" type="checkbox"></label><span class="px-1"></span><label for="blue-checkbox" class="py-1"><span>Blue </span><input id="blue-checkbox" style="padding: 0px" type="checkbox"></label><span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="applyPattern()">Apply</button></div><div id="tool-buttons-block" class="py-2">' + toolButtons + '<span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="picturePattern()">Reset</button></div></div>';
+        showTool(tool, code, position);
+      }
+      if (tool == 'Effect') {
+        code = '<div class="col-lg-12"><label class="py-1"><span>Combine </span><input id="combine-checkbox" style="padding: 0px" type="checkbox" checked></label><div><span id="blur-slider-label">Blur </span><label id="blur-label" for="blur-slider" class="label-100"><input id="blur-slider" type="range" min="0" max="500" value="0" class="slider-90"></label><span id="brightness-slider-label">Brightness </span><label id="brightness-label" for="brightness-slider" class="label-100"><input id="brightness-slider" type="range" min="0" max="1000" value="100" class="slider-90"></label><span id="contrast-slider-label">Contrast </span><label id="contrast-label" for="contrast-slider" class="label-100"><input id="contrast-slider" type="range" min="0" max="1000" value="100" class="slider-90"></label><span id="grayscale-slider-label">Grayscale </span><label id="grayscale-label" for="grayscale-slider" class="label-100"><input id="grayscale-slider" type="range" min="0" max="100" value="0" class="slider-90"></label><span id="hue-rotate-slider-label">Hue rotate </span><label id="hue-rotate-label" for="hue-rotate-slider" class="label-100"><input id="hue-rotate-slider" type="range" min="0" max="360" value="0" class="slider-90"></label><span id="invert-slider-label">Invert </span><label id="invert-label" for="invert-slider" class="label-100"><input id="invert-slider" type="range" min="0" max="100" value="0" class="slider-90"></label><span id="opacity-slider-label">Opacity </span><label id="opacity-label" for="opacity-slider" class="label-100"><input id="opacity-slider" type="range" min="0" max="100" value="0" class="slider-90"></label><span id="saturate-slider-label">Saturate </span><label id="saturate-label" for="saturate-slider" class="label-100"><input id="saturate-slider" type="range" min="0" max="1000" value="100" class="slider-90"></label><span id="sepia-slider-label">Sepia </span><label id="sepia-label" for="sepia-slider" class="label-100"><input id="sepia-slider" type="range" min="0" max="100" value="0" class="slider-90"></label></div><div id="tool-buttons-block" class="py-2">' + toolButtons + '<span class="px-1"></span><button type="button" class="btn btn-primary btn-sm normalize-1px" onclick="pictureEffect()">Reset</button></div></div>';
+        showTool(tool, code, position);
+      }
+      if (tool == 'Convert') {
+        code = '<div class="col-lg-12"><div class="py-2"><span>Select the file format you want to convert your picture to.</span></div><div class="py-2"><a href="https://freeonlinetools.info/image-converter.php?to=jpeg" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">JPEG</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=png" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">PNG</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=gif" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">GIF</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=xbm" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">XBM</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=avif" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">AVIF</a></div><div class="py-2"><a href="https://freeonlinetools.info/image-converter.php?to=wbmp" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">WBMP</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=webp" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">WebP</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=bmp" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">BMP</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=heic" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">HEIC</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=tga" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">TGA</a></div><div class="py-2"><a href="https://freeonlinetools.info/image-converter.php?to=svg" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">SVG</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=tiff" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">TIFF</a><span class="px-1"></span><a href="https://freeonlinetools.info/image-converter.php?to=pdf" target="_blank" role="button" class="btn btn-primary btn-sm normalize-1px">PDF</a></div></div>';
+        showTool(tool, code, position);
+      }
+    }
+  </script>
+</body>
+
+</html>
