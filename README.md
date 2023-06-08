@@ -74,7 +74,7 @@ To close the review tab, in order to free up memory, it is advisable to use the 
 ![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/athletes_demo.png)<br>
 *Contrast increased and blur effect added*
 
-![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/car_demo.png)
+![Picture Colorizer](https://raw.githubusercontent.com/igeorgiev2/picture-colorizer/main/car_demo.png)<br>
 *Mixed colors and patterns*
 
 =============
